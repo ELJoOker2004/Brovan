@@ -1784,17 +1784,11 @@ namespace Brovan.Core.Emulation.OS.Windows
         {
             Dictionary<string, IWinDevice> Devices = new Dictionary<string, IWinDevice>(StringComparer.OrdinalIgnoreCase);
 
-            var DeviceTypes = Assembly.GetExecutingAssembly().GetTypes().Where(Type =>
-                Type.Namespace == typeof(WinSysHelper).Namespace &&
-                typeof(IWinDevice).IsAssignableFrom(Type) &&
-                !Type.IsInterface &&
-                !Type.IsAbstract);
-
-            foreach (Type Type in DeviceTypes)
+            // Device instances are produced at compile time by the Brovan.SourceGen source generator
+            // (Brovan.Generated.GeneratedDevices) instead of runtime reflection, keeping this AOT/trimming-safe.
+            // Same discovery criteria: non-abstract IWinDevice implementations in this namespace.
+            foreach (IWinDevice Device in Brovan.Generated.GeneratedDevices.CreateAll())
             {
-                if (Activator.CreateInstance(Type, true) is not IWinDevice Device)
-                    continue;
-
                 string DeviceName = NormalizeDevicePath(Device.DeviceName);
                 if (string.IsNullOrEmpty(DeviceName))
                     continue;

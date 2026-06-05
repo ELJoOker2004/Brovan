@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using static Brovan.Core.Helpers.BinaryHelpers;
@@ -14,7 +13,7 @@ namespace Brovan.Core.Emulation.OS.Windows
 
             ulong LinkHandle = Instance.WinHelper.GetArg64(0);
             ulong LinkTargetPtr = Instance.WinHelper.GetArg64(1);
-            uint ReturnedLengthPtr = (uint)Instance.WinHelper.GetArg64(2);
+            ulong ReturnedLengthPtr = Instance.WinHelper.GetArg64(2);
 
             if (LinkHandle == 0 || LinkTargetPtr == 0)
                 return NTSTATUS.STATUS_INVALID_PARAMETER;
@@ -71,17 +70,9 @@ namespace Brovan.Core.Emulation.OS.Windows
 
         private static string TryGetTargetString(IHandleObject Obj)
         {
-            Type T = Obj.GetType();
-
-            FieldInfo Field = T.GetField("Target", BindingFlags.Public | BindingFlags.Instance);
-            if (Field != null && Field.FieldType == typeof(string))
-                return (string)Field.GetValue(Obj);
-
-            PropertyInfo Prop = T.GetProperty("Target", BindingFlags.Public | BindingFlags.Instance);
-            if (Prop != null && Prop.PropertyType == typeof(string) && Prop.CanRead)
-                return (string)Prop.GetValue(Obj);
-
-            return null;
+            // Direct, AOT-safe access. Reflection (GetField/GetProperty) is trimmed away under
+            // NativeAOT and would return null here, making this syscall wrongly fail with NOT_SUPPORTED.
+            return Obj is WinSymbolicLink Link ? Link.Target : null;
         }
     }
 }

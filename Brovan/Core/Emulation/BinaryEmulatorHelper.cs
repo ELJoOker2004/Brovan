@@ -1169,30 +1169,15 @@ namespace Brovan.Core.Emulation
 
             if (SupportedFunctions.Count == 0)
             {
-                // dynamically build the list based on implemented functions using reflection. makes it easier to maintain the code.
-                // all syscalls will need to have the interface IWinSyscall and be in the namespace Brovan.Core.Emulation.OS.Windows
-                // and also have the same function name as in ntdll/win32u
-                var SyscallTypes = Assembly.GetExecutingAssembly().GetTypes().Where(T =>
-                    T.IsClass &&
-                    !T.IsAbstract &&
-                    typeof(IWinSyscall).IsAssignableFrom(T) &&
-                    T.Namespace == "Brovan.Core.Emulation.OS.Windows");
+                // The handler list is produced at compile time by the Brovan.SourceGen source generator
+                // (Brovan.Generated.GeneratedSyscalls) instead of runtime reflection, so it stays AOT/trimming-safe.
+                // Discovery criteria are identical: non-abstract classes implementing IWinSyscall in the
+                // Brovan.Core.Emulation.OS.Windows (and .Win32k) namespaces, named after the ntdll/win32u export.
+                foreach (string Name in Brovan.Generated.GeneratedSyscalls.WindowsNames)
+                    SupportedFunctions.Add(Name);
 
-                foreach (Type Type in SyscallTypes)
-                {
-                    SupportedFunctions.Add(Type.Name);
-                }
-
-                var SyscallTypesWin32k = Assembly.GetExecutingAssembly().GetTypes().Where(T =>
-                    T.IsClass &&
-                    !T.IsAbstract &&
-                    typeof(IWinSyscall).IsAssignableFrom(T) &&
-                    T.Namespace == "Brovan.Core.Emulation.OS.Windows.Win32k");
-
-                foreach (Type Type in SyscallTypesWin32k)
-                {
-                    SupportedFunctionsWin32k.Add(Type.Name);
-                }
+                foreach (string Name in Brovan.Generated.GeneratedSyscalls.Win32kNames)
+                    SupportedFunctionsWin32k.Add(Name);
             }
 
             Dictionary<uint, IWinSyscall> SyscallDictionary = new Dictionary<uint, IWinSyscall>();
@@ -1234,19 +1219,11 @@ namespace Brovan.Core.Emulation
                             if (SyscallNumber == uint.MaxValue)
                                 continue;
 
-                            Type Type = Assembly.GetExecutingAssembly().GetType("Brovan.Core.Emulation.OS.Windows." + SupportedFunction);
-                            if (Type == null)
+                            IWinSyscall? Instance = Brovan.Generated.GeneratedSyscalls.CreateWindows(SupportedFunction);
+                            if (Instance == null)
                                 continue;
 
-                            try
-                            {
-                                IWinSyscall Instance = (IWinSyscall)Activator.CreateInstance(Type);
-                                SyscallDictionary[SyscallNumber] = Instance;
-                            }
-                            catch (Exception Ex)
-                            {
-                                Utils.LogError($"[WinSyscallBuilder] Failed to instantiate {Type.FullName}: {Ex.Message}");
-                            }
+                            SyscallDictionary[SyscallNumber] = Instance;
                         }
                     }
 
@@ -1266,19 +1243,11 @@ namespace Brovan.Core.Emulation
                             if (SyscallNumber == uint.MaxValue)
                                 continue;
 
-                            Type Type = Assembly.GetExecutingAssembly().GetType("Brovan.Core.Emulation.OS.Windows.Win32k." + SupportedWin32k);
-                            if (Type == null)
+                            IWinSyscall? Instance = Brovan.Generated.GeneratedSyscalls.CreateWin32k(SupportedWin32k);
+                            if (Instance == null)
                                 continue;
 
-                            try
-                            {
-                                IWinSyscall Instance = (IWinSyscall)Activator.CreateInstance(Type);
-                                SyscallDictionary[SyscallNumber] = Instance;
-                            }
-                            catch (Exception Ex)
-                            {
-                                Utils.LogError($"[WinSyscallBuilder] Failed to instantiate {Type.FullName}: {Ex.Message}");
-                            }
+                            SyscallDictionary[SyscallNumber] = Instance;
                         }
                     }
                 }
@@ -1334,19 +1303,11 @@ namespace Brovan.Core.Emulation
                         if (SyscallNumber == uint.MaxValue)
                             continue;
 
-                        Type Type = Assembly.GetExecutingAssembly().GetType("Brovan.Core.Emulation.OS.Windows." + SupportedFunction);
-                        if (Type == null)
+                        IWinSyscall? Instance = Brovan.Generated.GeneratedSyscalls.CreateWindows(SupportedFunction);
+                        if (Instance == null)
                             continue;
 
-                        try
-                        {
-                            IWinSyscall Instance = (IWinSyscall)Activator.CreateInstance(Type);
-                            SyscallDictionary[SyscallNumber] = Instance;
-                        }
-                        catch (Exception Ex)
-                        {
-                            Utils.LogError($"[WinSyscallBuilder] Failed to instantiate {Type.FullName}: {Ex.Message}");
-                        }
+                        SyscallDictionary[SyscallNumber] = Instance;
                     }
 
                     if (Ntdll != null)
